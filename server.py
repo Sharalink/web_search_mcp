@@ -13,7 +13,8 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 # The log_level is necessary for Cline to work: https://github.com/jlowin/fastmcp/issues/81
-mcp = FastMCP("Interactive Feedback MCP", log_level="ERROR")
+# Using INFO level for better debugging in Cursor
+mcp = FastMCP("Interactive Feedback MCP", log_level="INFO")
 
 def launch_feedback_ui(project_directory: str, summary: str) -> dict[str, str]:
     # Create a temporary file for the feedback result
@@ -66,8 +67,14 @@ def interactive_feedback(
     project_directory: Annotated[str, Field(description="Full path to the project directory")],
     summary: Annotated[str, Field(description="Short, one-line summary of the changes")],
 ) -> Dict[str, str]:
-    """Request interactive feedback for a given project directory and summary"""
-    return launch_feedback_ui(first_line(project_directory), first_line(summary))
+    """Request interactive feedback for a given project directory and summary. This tool opens a UI where the user can provide feedback and run commands."""
+    try:
+        return launch_feedback_ui(first_line(project_directory), first_line(summary))
+    except Exception as e:
+        return {
+            "command_logs": f"Error: {str(e)}",
+            "interactive_feedback": f"Failed to launch feedback UI: {str(e)}"
+        }
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

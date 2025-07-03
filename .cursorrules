@@ -1,0 +1,67 @@
+# Cursor AI Rules for Enhanced MCP Tools
+
+## MCP工具使用策略
+
+### 核心原则
+1. **数据优先**: 回答需要最新信息的问题时，始终先使用web_search收集数据
+2. **批量操作**: 处理多个URL时使用batch_url_extract而不是多次web_unlocker  
+3. **自动化流程**: 数据收集和处理应该自动完成，只在真正需要用户决策时使用interactive_feedback
+4. **结构化保存**: 重要的收集数据应该使用create_dataset保存为结构化格式
+5. **效率优先**: 优先使用专业的工具组合完成任务，减少不必要的用户交互
+
+### 典型工作流程
+
+#### 研究型任务
+- 流程: web_search → batch_url_extract → create_dataset → 分析总结 → (可选)interactive_feedback
+- 示例: "研究AI技术趋势" → 先搜索 → 批量提取内容 → 保存数据 → 分析 → 询问是否需要深入特定方向
+
+#### 数据收集任务  
+- 流程: web_search → browser_automation → create_dataset → 直接提供结果
+- 示例: "收集公司信息" → 搜索目标 → 自动化收集 → 保存数据 → 直接展示结果
+
+#### 内容分析任务
+- 流程: web_unlocker/batch_url_extract → 直接分析 → (可选)create_dataset保存结果
+- 示例: "分析这些网页" → 批量提取内容 → 分析 → 可选保存分析结果
+
+### 工具选择指南
+
+- **已知具体URL** → 使用 `web_unlocker` 或 `batch_url_extract`
+- **需要搜索信息** → 使用 `web_search`，通常设置 `extract_content=true`
+- **需要复杂网站交互** → 使用 `browser_automation`
+- **需要保存数据** → 使用 `create_dataset`，优先CSV格式
+- **需要查询已有数据** → 使用 `query_dataset`
+- **需要用户决策** → 使用 `interactive_feedback`
+
+### 重要注意事项
+
+1. **避免过度交互**: 不要每个步骤都使用interactive_feedback，只在关键决策点使用
+2. **批量优于逐个**: 多个URL处理时，使用batch_url_extract而不是循环调用web_unlocker
+3. **数据结构化**: 收集的数据应该立即使用create_dataset保存为结构化格式
+4. **错误容忍**: 网络请求失败时提供替代方案，保存部分成功的结果
+
+### 数据集管理
+
+创建数据集时使用一致的结构：
+```json
+[
+  {
+    "source_url": "来源URL", 
+    "title": "标题",
+    "content": "内容",
+    "extracted_time": "提取时间",
+    "category": "分类"
+  }
+]
+```
+
+### 示例场景
+
+用户问: "帮我研究最新的AI工具"
+正确流程:
+1. web_search(query="2024最新AI工具", num_results=10, extract_content=true)
+2. 分析搜索结果和提取的内容
+3. create_dataset保存工具信息
+4. 提供分析总结
+5. 如需要深入了解特定工具，再使用interactive_feedback询问
+
+错误做法: 立即使用interactive_feedback询问要研究什么，而不是先收集数据 

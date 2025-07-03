@@ -1,0 +1,24 @@
+{
+  "_comment": "Enhanced MCP Server Configuration by Emink - Based on Fábio Ferreira's Interactive Feedback MCP",
+  "_description": "Dual-server setup: interactive-feedback for user interaction, web-ai-assistant for automation",
+  "mcpServers": {
+    "interactive-feedback": {
+      "command": "/Users/zch/src/dev/cursor-mcp/web_search_mcp/start_server.sh",
+      "timeout": 30000,
+      "autoApprove": ["interactive_feedback"]
+    },
+    "web-ai-assistant": {
+      "command": "/Users/zch/src/dev/cursor-mcp/web_search_mcp/start_pure_server.sh",
+      "timeout": 60000,
+      "autoApprove": [
+        "web_unlocker",
+        "batch_url_extract",
+        "web_search",
+        "browser_automation",
+        "list_datasets",
+        "create_dataset",
+        "query_dataset"
+      ]
+    }
+  }
+}

@@ -1,118 +1,153 @@
-# Interactive Feedback MCP
+# Web Search MCP - Enhanced MCP Server
 
-Developed by Fábio Ferreira ([@fabiomlferreira](https://x.com/fabiomlferreira)).
-Check out [dotcursorrules.com](https://dotcursorrules.com/) for more AI development enhancements.
+> **增强开发：** Emink  
+> **基于：** [Fábio Ferreira](https://x.com/fabiomlferreira) 的 Interactive Feedback MCP  
+> **仓库：** https://github.com/Sharalink/web_search_mcp
 
-Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-loop workflow in AI-assisted development tools like [Cursor](https://www.cursor.com). This server allows you to run commands, view their output, and provide textual feedback directly to the AI. It is also compatible with [Cline](https://cline.bot) and [Windsurf](https://windsurf.com).
+这是一个功能全面的MCP（Model Context Protocol）服务器，提供强大的网络搜索、数据提取、浏览器自动化和交互式反馈功能。
 
-![Interactive Feedback UI - Main View](https://github.com/noopstudios/interactive-feedback-mcp/blob/main/.github/interactive_feedback_1.jpg?raw=true)
-![Interactive Feedback UI - Command Section Open](https://github.com/noopstudios/interactive-feedback-mcp/blob/main/.github/interactive_feedback_2.jpg)
+![Enhanced MCP Server](https://github.com/Sharalink/web_search_mcp/blob/main/images/feedback.png?raw=true)
 
-## Prompt Engineering
+## 🌟 主要功能
 
-For the best results, add the following to your custom prompt in your AI assistant, you should add it on a rule or directly in the prompt (e.g., Cursor):
+- 🔍 **智能网络搜索** - DuckDuckGo搜索引擎集成
+- 🔓 **网页内容解锁** - 绕过基本限制，提取清洁内容
+- 🤖 **浏览器自动化** - 基于Selenium的Chrome自动化操作
+- 📊 **数据集管理** - 创建、查询和管理CSV/JSON数据集
+- 💬 **交互式反馈** - 人工智能协作工作流程
+- ⚡ **批量处理** - 高效的批量URL处理能力
 
-> Whenever you want to ask a question, always call the MCP `interactive_feedback`.  
-> Whenever you’re about to complete a user request, call the MCP `interactive_feedback` instead of simply ending the process.
-> Keep calling MCP until the user’s feedback is empty, then end the request.
+## 🚀 快速开始
 
-This will ensure your AI assistant uses this MCP server to request user feedback before marking the task as completed.
+### 1. 安装依赖
 
-## 💡 Why Use This?
-By guiding the assistant to check in with the user instead of branching out into speculative, high-cost tool calls, this module can drastically reduce the number of premium requests (e.g., OpenAI tool invocations) on platforms like Cursor. In some cases, it helps consolidate what would be up to 25 tool calls into a single, feedback-aware request — saving resources and improving performance.
+```bash
+# 确保已安装Python 3.11+和uv
+pip install uv
 
-## Configuration
+# 克隆仓库
+git clone https://github.com/Sharalink/web_search_mcp.git
+cd web_search_mcp
 
-This MCP server uses Qt's `QSettings` to store configuration on a per-project basis. This includes:
-*   The command to run.
-*   Whether to execute the command automatically on the next startup for that project (see "Execute automatically on next run" checkbox).
-*   The visibility state (shown/hidden) of the command section (this is saved immediately when toggled).
-*   Window geometry and state (general UI preferences).
-
-These settings are typically stored in platform-specific locations (e.g., registry on Windows, plist files on macOS, configuration files in `~/.config` or `~/.local/share` on Linux) under an organization name "FabioFerreira" and application name "InteractiveFeedbackMCP", with a unique group for each project directory.
-
-The "Save Configuration" button in the UI primarily saves the current command typed into the command input field and the state of the "Execute automatically on next run" checkbox for the active project. The visibility of the command section is saved automatically when you toggle it. General window size and position are saved when the application closes.
-
-## Installation (Cursor)
-
-![Instalation on Cursor](https://github.com/noopstudios/interactive-feedback-mcp/blob/main/.github/cursor-example.jpg?raw=true)
-
-1.  **Prerequisites:**
-    *   Python 3.11 or newer.
-    *   [uv](https://github.com/astral-sh/uv) (Python package manager). Install it with:
-        *   Windows: `pip install uv`
-        *   Linux/Mac: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-2.  **Get the code:**
-    *   Clone this repository:
-        `git clone https://github.com/noopstudios/interactive-feedback-mcp.git`
-    *   Or download the source code.
-3.  **Navigate to the directory:**
-    *   `cd path/to/interactive-feedback-mcp`
-4.  **Install dependencies:**
-    *   `uv sync` (this creates a virtual environment and installs packages)
-5.  **Run the MCP Server:**
-    *   `uv run server.py`
-6.  **Configure in Cursor:**
-    *   Cursor typically allows specifying custom MCP servers in its settings. You'll need to point Cursor to this running server. The exact mechanism might vary, so consult Cursor's documentation for adding custom MCPs.
-    *   **Manual Configuration (e.g., via `mcp.json`)**
-        **Remember to change the `/Users/fabioferreira/Dev/scripts/interactive-feedback-mcp` path to the actual path where you cloned the repository on your system.**
-
-        ```json
-        {
-          "mcpServers": {
-            "interactive-feedback-mcp": {
-              "command": "uv",
-              "args": [
-                "--directory",
-                "/Users/fabioferreira/Dev/scripts/interactive-feedback-mcp",
-                "run",
-                "server.py"
-              ],
-              "timeout": 600,
-              "autoApprove": [
-                "interactive_feedback"
-              ]
-            }
-          }
-        }
-        ```
-    *   You might use a server identifier like `interactive-feedback-mcp` when configuring it in Cursor.
-
-### For Cline / Windsurf
-
-Similar setup principles apply. You would configure the server command (e.g., `uv run server.py` with the correct `--directory` argument pointing to the project directory) in the respective tool's MCP settings, using `interactive-feedback-mcp` as the server identifier.
-
-## Development
-
-To run the server in development mode with a web interface for testing:
-
-```sh
-uv run fastmcp dev server.py
+# 安装依赖
+uv sync
 ```
 
-This will open a web interface and allow you to interact with the MCP tools for testing.
+### 2. 安装Chrome浏览器（用于自动化功能）
 
-## Available tools
+```bash
+# macOS
+brew install --cask google-chrome
 
-Here's an example of how the AI assistant would call the `interactive_feedback` tool:
+# 或从 https://www.google.com/chrome/ 下载
+```
 
-```xml
-<use_mcp_tool>
-  <server_name>interactive-feedback-mcp</server_name>
-  <tool_name>interactive_feedback</tool_name>
-  <arguments>
-    {
-      "project_directory": "/path/to/your/project",
-      "summary": "I've implemented the changes you requested and refactored the main module."
+### 3. 配置Cursor
+
+将以下配置添加到 `~/.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "interactive-feedback": {
+      "command": "/path/to/your/web_search_mcp/start_server.sh",
+      "timeout": 30000,
+      "autoApprove": ["interactive_feedback"]
+    },
+    "web-ai-assistant": {
+      "command": "/path/to/your/web_search_mcp/start_pure_server.sh",
+      "timeout": 60000,
+      "autoApprove": [
+        "web_unlocker",
+        "batch_url_extract", 
+        "web_search",
+        "browser_automation",
+        "list_datasets",
+        "create_dataset",
+        "query_dataset"
+      ]
     }
-  </arguments>
-</use_mcp_tool>
+  }
+}
 ```
 
-## Acknowledgements & Contact
+**重要：** 将 `/path/to/your/web_search_mcp` 替换为您的实际项目路径。
 
-If you find this Interactive Feedback MCP useful, the best way to show appreciation is by following Fábio Ferreira on [X @fabiomlferreira](https://x.com/fabiomlferreira).
+### 4. 重启Cursor并开始使用
 
-For any questions, suggestions, or if you just want to share how you're using it, feel free to reach out on X!
+## 🛠️ 可用工具
 
-Also, check out [dotcursorrules.com](https://dotcursorrules.com/) for more resources on enhancing your AI-assisted development workflow.
+### 网络功能
+- `web_search` - DuckDuckGo搜索，支持内容提取
+- `web_unlocker` - 解锁网页内容，提取文本
+- `batch_url_extract` - 批量处理多个URL
+
+### 自动化功能  
+- `browser_automation` - Chrome浏览器自动化操作
+
+### 数据管理
+- `create_dataset` - 创建CSV/JSON数据集
+- `query_dataset` - 查询和过滤数据
+- `list_datasets` - 列出所有数据集
+
+### 交互功能
+- `interactive_feedback` - 用户交互和反馈收集
+
+## 📚 使用示例
+
+### 智能研究
+```
+"帮我研究2024年AI技术发展趋势，收集相关数据并分析"
+```
+AI会自动：搜索信息 → 提取内容 → 保存数据 → 分析 → 询问深入方向
+
+### 数据收集
+```
+"收集前20家AI公司的基本信息"
+```
+AI会自动：搜索公司 → 自动化收集 → 保存数据 → 提供结果
+
+### 批量内容提取
+```
+"提取这些网址的内容：[URL列表]"
+```
+AI会使用：批量提取 → 保存内容 → 提供摘要
+
+## 🎯 AI使用建议
+
+为了最佳体验，建议在Cursor中添加以下规则：
+
+```
+## MCP工具使用策略
+
+1. **数据优先**: 需要最新信息时，先用web_search收集数据
+2. **批量优于单个**: 多URL处理用batch_url_extract 
+3. **自动化流程**: 数据收集自动完成，关键决策时才用interactive_feedback
+4. **结构化保存**: 重要数据用create_dataset保存
+5. **效率优先**: 减少不必要的人工干预
+```
+
+## 🤝 贡献与致谢
+
+**原作者：** [Fábio Ferreira](https://x.com/fabiomlferreira) - Interactive Feedback MCP核心功能  
+**增强开发：** Emink - 网络自动化、搜索、数据管理等功能  
+
+感谢原作者的优秀基础工作！
+
+### 相关项目
+- [原项目仓库](https://github.com/noopstudios/interactive-feedback-mcp)
+- [dotcursorrules.com](https://dotcursorrules.com/)
+
+## 📄 许可证
+
+继承原项目许可证。原始Interactive Feedback MCP由Fábio Ferreira开发。
+
+## 🔗 相关链接
+
+- [MCP协议官方文档](https://modelcontextprotocol.io/)
+- [Cursor文档](https://www.cursor.com/)
+- [GitHub仓库](https://github.com/Sharalink/web_search_mcp)
+
+---
+
+**开始体验强大的AI辅助研究和数据处理能力！** 🚀

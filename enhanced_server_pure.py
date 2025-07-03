@@ -116,67 +116,187 @@ async def get_with_retries(
 async def unlock_web_content(
     url: str, extract_text: bool = True, bypass_cloudflare: bool = False
 ) -> Dict[str, Any]:
-    """Unlock and extract content from web pages"""
+    """Unlock and extract content from web pages with improved content extraction"""
 
     try:
         content = await get_with_retries(url)
         soup = BeautifulSoup(content, "html.parser")
 
-        # Remove script and style elements
-        for script in soup(["script", "style", "nav", "footer", "header"]):
+        # Remove unwanted elements
+        for script in soup(
+            ["script", "style", "nav", "footer", "header", "aside", "form", "noscript"]
+        ):
             script.decompose()
 
         result = {
             "url": url,
-            "title": soup.title.string if soup.title else "No title",
+            "title": (
+                soup.title.string.strip()
+                if soup.title and soup.title.string
+                else "No title"
+            ),
             "raw_html": content if not extract_text else None,
             "status": "success",
         }
 
         if extract_text:
-            # Extract main content
-            main_content = (
-                soup.find("main")
-                or soup.find("article")
-                or soup.find("div", class_=re.compile(r"content|main|article"))
-            )
-            if main_content:
-                result["content"] = main_content.get_text(separator=" ", strip=True)
-            else:
-                result["content"] = soup.get_text(separator=" ", strip=True)
+            # Try multiple strategies to extract main content
+            main_content = None
+            content_text = ""
 
-            # Extract metadata
+            # Strategy 1: Look for common content containers
+            content_selectors = [
+                "main",
+                "article",
+                "[role='main']",
+                ".content",
+                ".main-content",
+                ".post-content",
+                ".entry-content",
+                ".article-content",
+                ".page-content",
+                "#content",
+                "#main",
+                ".container .row .col",  # Bootstrap-style layout
+            ]
+
+            for selector in content_selectors:
+                main_content = soup.select_one(selector)
+                if main_content:
+                    break
+
+            # Strategy 2: Find largest text block if no semantic container found
+            if not main_content:
+                text_divs = soup.find_all("div")
+                if text_divs:
+                    # Find div with most text content
+                    max_text_length = 0
+                    for div in text_divs:
+                        div_text = div.get_text(strip=True)
+                        if len(div_text) > max_text_length:
+                            max_text_length = len(div_text)
+                            main_content = div
+
+            # Strategy 3: Use body as fallback
+            if not main_content:
+                main_content = soup.find("body") or soup
+
+            if main_content:
+                # Clean up the content
+                content_text = main_content.get_text(separator=" ", strip=True)
+
+                # Clean up excessive whitespace
+                import re
+
+                content_text = re.sub(r"\s+", " ", content_text)
+                content_text = re.sub(r"\n\s*\n", "\n\n", content_text)
+
+                result["content"] = content_text.strip()
+            else:
+                result["content"] = "No content could be extracted"
+
+            # Extract metadata with improved parsing
             result["meta"] = {
                 "description": "",
                 "keywords": "",
+                "author": "",
+                "published_date": "",
+                "article_length": len(content_text),
             }
 
-            meta_desc = soup.find("meta", attrs={"name": "description"})
+            # Meta description
+            meta_desc = (
+                soup.find("meta", attrs={"name": "description"})
+                or soup.find("meta", attrs={"property": "og:description"})
+                or soup.find("meta", attrs={"name": "twitter:description"})
+            )
             if meta_desc:
-                result["meta"]["description"] = meta_desc.get("content", "")
+                result["meta"]["description"] = meta_desc.get("content", "").strip()
 
+            # Meta keywords
             meta_keywords = soup.find("meta", attrs={"name": "keywords"})
             if meta_keywords:
-                result["meta"]["keywords"] = meta_keywords.get("content", "")
+                result["meta"]["keywords"] = meta_keywords.get("content", "").strip()
+
+            # Author information
+            author_selectors = [
+                'meta[name="author"]',
+                'meta[name="article:author"]',
+                'meta[property="article:author"]',
+                ".author",
+                ".byline",
+                ".post-author",
+                '[rel="author"]',
+            ]
+
+            for selector in author_selectors:
+                author_elem = soup.select_one(selector)
+                if author_elem:
+                    if author_elem.name == "meta":
+                        result["meta"]["author"] = author_elem.get(
+                            "content", ""
+                        ).strip()
+                    else:
+                        result["meta"]["author"] = author_elem.get_text(strip=True)
+                    break
+
+            # Published date
+            date_selectors = [
+                'meta[property="article:published_time"]',
+                'meta[name="article:published_time"]',
+                'meta[name="pubdate"]',
+                "time[datetime]",
+                ".date",
+                ".published",
+                ".post-date",
+            ]
+
+            for selector in date_selectors:
+                date_elem = soup.select_one(selector)
+                if date_elem:
+                    if date_elem.name == "meta":
+                        result["meta"]["published_date"] = date_elem.get(
+                            "content", ""
+                        ).strip()
+                    elif date_elem.name == "time":
+                        result["meta"]["published_date"] = date_elem.get(
+                            "datetime", ""
+                        ).strip()
+                    else:
+                        result["meta"]["published_date"] = date_elem.get_text(
+                            strip=True
+                        )
+                    break
 
         return result
 
     except Exception as e:
-        return {"url": url, "status": "error", "error": str(e)}
+        return {
+            "url": url,
+            "status": "error",
+            "error": f"Content extraction failed: {str(e)}",
+            "content": "",
+            "title": "",
+            "meta": {},
+        }
 
 
 # === SEARCH/SERP FUNCTIONS ===
 
 
 async def search_duckduckgo(query: str, num_results: int = 10) -> List[Dict[str, str]]:
-    """Search using DuckDuckGo"""
+    """Search using DuckDuckGo with improved parsing"""
 
     try:
         headers = {
             "User-Agent": CONFIG["user_agent"].random,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
         }
 
-        # DuckDuckGo instant answer API
+        # DuckDuckGo search URL
         search_url = "https://html.duckduckgo.com/html/"
         params = {"q": query}
 
@@ -191,21 +311,75 @@ async def search_duckduckgo(query: str, num_results: int = 10) -> List[Dict[str,
         soup = BeautifulSoup(response.text, "html.parser")
         results = []
 
-        # Parse search results
-        for result_div in soup.find_all("div", class_="result")[:num_results]:
-            title_link = result_div.find("a", class_="result__a")
-            snippet_div = result_div.find("a", class_="result__snippet")
+        # Try multiple parsing strategies for DuckDuckGo results
+        result_containers = []
 
-            if title_link:
-                results.append(
-                    {
-                        "title": title_link.get_text(strip=True),
-                        "url": title_link.get("href", ""),
-                        "snippet": (
-                            snippet_div.get_text(strip=True) if snippet_div else ""
-                        ),
-                    }
-                )
+        # Strategy 1: Original selectors
+        result_containers.extend(soup.find_all("div", class_="result"))
+
+        # Strategy 2: Alternative selectors (for updated DDG layout)
+        if not result_containers:
+            result_containers.extend(soup.find_all("div", class_="web-result"))
+
+        # Strategy 3: Generic result containers
+        if not result_containers:
+            result_containers.extend(
+                soup.find_all("div", class_=lambda x: x and "result" in x.lower())
+            )
+
+        # Parse search results with multiple fallback strategies
+        for result_div in result_containers[:num_results]:
+            try:
+                # Strategy 1: Original selectors
+                title_link = result_div.find("a", class_="result__a")
+                snippet_div = result_div.find("a", class_="result__snippet")
+
+                # Strategy 2: Alternative selectors
+                if not title_link:
+                    title_link = result_div.find(
+                        "a", attrs={"data-testid": "result-title-a"}
+                    )
+                if not snippet_div:
+                    snippet_div = result_div.find(
+                        "span", attrs={"data-testid": "result-snippet"}
+                    )
+
+                # Strategy 3: Generic fallbacks
+                if not title_link:
+                    title_link = result_div.find("a", href=True)
+                if not snippet_div:
+                    snippet_div = result_div.find("span") or result_div.find("div")
+
+                if title_link and title_link.get("href"):
+                    title = title_link.get_text(strip=True)
+                    url = title_link.get("href", "")
+                    snippet = snippet_div.get_text(strip=True) if snippet_div else ""
+
+                    # Clean URL (remove DDG tracking)
+                    if url.startswith("/l/?uddg="):
+                        # Extract actual URL from DuckDuckGo redirect
+                        import urllib.parse
+
+                        parsed = urllib.parse.parse_qs(url.split("?")[1])
+                        if "uddg" in parsed:
+                            url = urllib.parse.unquote(parsed["uddg"][0])
+
+                    if title and url:
+                        results.append({"title": title, "url": url, "snippet": snippet})
+
+            except Exception as e:
+                # Skip malformed results but continue processing
+                continue
+
+        if not results:
+            # If no results found, try a simpler extraction
+            links = soup.find_all("a", href=True)
+            for link in links[:num_results]:
+                href = link.get("href", "")
+                if href.startswith("http") and not "duckduckgo.com" in href:
+                    title = link.get_text(strip=True)
+                    if title and len(title) > 5:  # Filter out very short titles
+                        results.append({"title": title, "url": href, "snippet": ""})
 
         return results
 
@@ -216,31 +390,83 @@ async def search_duckduckgo(query: str, num_results: int = 10) -> List[Dict[str,
 async def search_and_extract(
     query: str, num_results: int = 5, extract_content: bool = False
 ) -> Dict[str, Any]:
-    """Search and optionally extract content from results"""
+    """Search and optionally extract content from results with improved error handling"""
 
     search_results = await search_duckduckgo(query, num_results)
 
-    result = {"query": query, "results": search_results, "extracted_content": []}
+    result = {
+        "query": query,
+        "results": search_results,
+        "extracted_content": [],
+        "status": "success",
+    }
 
     if extract_content and search_results and not search_results[0].get("error"):
-        # Extract content from first few results
-        for i, search_result in enumerate(search_results[:3]):
-            if "url" in search_result:
-                content = await unlock_web_content(
-                    search_result["url"], extract_text=True
-                )
-                result["extracted_content"].append(
-                    {
-                        "index": i,
-                        "url": search_result["url"],
-                        "title": search_result["title"],
-                        "content": (
-                            content.get("content", "")[:2000] + "..."
-                            if content.get("content")
-                            else "No content extracted"
-                        ),
-                    }
-                )
+        # Extract content from top results with better error handling
+        extraction_count = 0
+        for i, search_result in enumerate(search_results):
+            if extraction_count >= 3:  # Limit to 3 extractions max
+                break
+
+            if "url" in search_result and search_result["url"]:
+                try:
+                    content = await unlock_web_content(
+                        search_result["url"], extract_text=True
+                    )
+
+                    if content.get("status") == "success":
+                        # Get more content - increase from 2000 to 5000 chars
+                        content_text = content.get("content", "")
+                        if len(content_text) > 5000:
+                            content_text = content_text[:5000] + "..."
+
+                        result["extracted_content"].append(
+                            {
+                                "index": i,
+                                "url": search_result["url"],
+                                "title": search_result["title"],
+                                "snippet": search_result.get("snippet", ""),
+                                "content": content_text,
+                                "meta": content.get("meta", {}),
+                                "status": "success",
+                            }
+                        )
+                        extraction_count += 1
+                    else:
+                        result["extracted_content"].append(
+                            {
+                                "index": i,
+                                "url": search_result["url"],
+                                "title": search_result["title"],
+                                "status": "error",
+                                "error": content.get(
+                                    "error", "Failed to extract content"
+                                ),
+                            }
+                        )
+
+                except Exception as e:
+                    result["extracted_content"].append(
+                        {
+                            "index": i,
+                            "url": search_result["url"],
+                            "title": search_result["title"],
+                            "status": "error",
+                            "error": str(e),
+                        }
+                    )
+
+                # Add delay between extractions to be respectful
+                await asyncio.sleep(1)
+
+    # Add summary statistics
+    result["summary"] = {
+        "search_results_count": len([r for r in search_results if not r.get("error")]),
+        "content_extractions_attempted": len(result["extracted_content"]),
+        "content_extractions_successful": len(
+            [e for e in result["extracted_content"] if e.get("status") == "success"]
+        ),
+    }
 
     return result
 

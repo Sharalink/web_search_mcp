@@ -284,8 +284,8 @@ async def unlock_web_content(
 # === SEARCH/SERP FUNCTIONS ===
 
 
-async def search_duckduckgo(query: str, num_results: int = 10) -> List[Dict[str, str]]:
-    """Search using DuckDuckGo with improved parsing"""
+async def search_bing(query: str, num_results: int = 10) -> List[Dict[str, str]]:
+    """Search using Bing with robust parsing"""
 
     try:
         headers = {
@@ -294,11 +294,12 @@ async def search_duckduckgo(query: str, num_results: int = 10) -> List[Dict[str,
             "Accept-Language": "en-US,en;q=0.5",
             "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive",
+            "Referer": "https://www.bing.com/",
         }
 
-        # DuckDuckGo search URL
-        search_url = "https://html.duckduckgo.com/html/"
-        params = {"q": query}
+        # Bing search URL
+        search_url = "https://www.bing.com/search"
+        params = {"q": query, "count": min(num_results, 50)}
 
         response = requests.get(
             search_url,
@@ -311,42 +312,39 @@ async def search_duckduckgo(query: str, num_results: int = 10) -> List[Dict[str,
         soup = BeautifulSoup(response.text, "html.parser")
         results = []
 
-        # Try multiple parsing strategies for DuckDuckGo results
+        # Try multiple parsing strategies for Bing results
         result_containers = []
 
-        # Strategy 1: Original selectors
-        result_containers.extend(soup.find_all("div", class_="result"))
+        # Strategy 1: Main result containers
+        result_containers.extend(soup.find_all("li", class_="b_algo"))
 
-        # Strategy 2: Alternative selectors (for updated DDG layout)
+        # Strategy 2: Alternative result containers
         if not result_containers:
-            result_containers.extend(soup.find_all("div", class_="web-result"))
+            result_containers.extend(soup.find_all("div", class_="b_algo"))
 
         # Strategy 3: Generic result containers
         if not result_containers:
             result_containers.extend(
-                soup.find_all("div", class_=lambda x: x and "result" in x.lower())
+                soup.find_all("div", class_=lambda x: x and "algo" in x.lower())
             )
 
         # Parse search results with multiple fallback strategies
         for result_div in result_containers[:num_results]:
             try:
-                # Strategy 1: Original selectors
-                title_link = result_div.find("a", class_="result__a")
-                snippet_div = result_div.find("a", class_="result__snippet")
+                # Strategy 1: Standard Bing selectors
+                title_link = result_div.find("h2")
+                if title_link:
+                    title_link = title_link.find("a")
+
+                snippet_div = result_div.find("p") or result_div.find(
+                    "div", class_="b_caption"
+                )
 
                 # Strategy 2: Alternative selectors
                 if not title_link:
-                    title_link = result_div.find(
-                        "a", attrs={"data-testid": "result-title-a"}
-                    )
-                if not snippet_div:
-                    snippet_div = result_div.find(
-                        "span", attrs={"data-testid": "result-snippet"}
-                    )
+                    title_link = result_div.find("a", href=True)
 
                 # Strategy 3: Generic fallbacks
-                if not title_link:
-                    title_link = result_div.find("a", href=True)
                 if not snippet_div:
                     snippet_div = result_div.find("span") or result_div.find("div")
 
@@ -355,28 +353,26 @@ async def search_duckduckgo(query: str, num_results: int = 10) -> List[Dict[str,
                     url = title_link.get("href", "")
                     snippet = snippet_div.get_text(strip=True) if snippet_div else ""
 
-                    # Clean URL (remove DDG tracking)
-                    if url.startswith("/l/?uddg="):
-                        # Extract actual URL from DuckDuckGo redirect
-                        import urllib.parse
-
-                        parsed = urllib.parse.parse_qs(url.split("?")[1])
-                        if "uddg" in parsed:
-                            url = urllib.parse.unquote(parsed["uddg"][0])
-
-                    if title and url:
-                        results.append({"title": title, "url": url, "snippet": snippet})
+                    # Clean and validate URL
+                    if url.startswith("http") and not "bing.com" in url:
+                        if title and len(title) > 3:  # Filter out very short titles
+                            results.append(
+                                {"title": title, "url": url, "snippet": snippet}
+                            )
 
             except Exception as e:
                 # Skip malformed results but continue processing
                 continue
 
+        # If no results found with main strategy, try backup extraction
         if not results:
-            # If no results found, try a simpler extraction
             links = soup.find_all("a", href=True)
             for link in links[:num_results]:
                 href = link.get("href", "")
-                if href.startswith("http") and not "duckduckgo.com" in href:
+                if href.startswith("http") and not any(
+                    domain in href
+                    for domain in ["bing.com", "microsoft.com", "msn.com"]
+                ):
                     title = link.get_text(strip=True)
                     if title and len(title) > 5:  # Filter out very short titles
                         results.append({"title": title, "url": href, "snippet": ""})
@@ -392,7 +388,7 @@ async def search_and_extract(
 ) -> Dict[str, Any]:
     """Search and optionally extract content from results with improved error handling"""
 
-    search_results = await search_duckduckgo(query, num_results)
+    search_results = await search_bing(query, num_results)
 
     result = {
         "query": query,
@@ -773,7 +769,7 @@ async def handle_list_tools() -> list[types.Tool]:
         # Search/SERP
         types.Tool(
             name="web_search",
-            description="Search the web and optionally extract content from results using DuckDuckGo.",
+            description="Search the web and optionally extract content from results using Bing.",
             inputSchema={
                 "type": "object",
                 "properties": {

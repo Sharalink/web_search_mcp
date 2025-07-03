@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from enhanced_server_pure import (
     search_and_extract,
-    search_duckduckgo,
+    search_bing,
     unlock_web_content,
 )
 
@@ -24,7 +24,7 @@ async def test_search_basic():
     print("🔍 测试基本搜索功能...")
 
     query = "Python programming tutorial"
-    results = await search_duckduckgo(query, num_results=5)
+    results = await search_bing(query, num_results=5)
 
     print(f"搜索查询: {query}")
     print(f"结果数量: {len(results)}")
